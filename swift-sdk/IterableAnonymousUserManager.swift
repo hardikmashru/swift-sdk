@@ -7,19 +7,7 @@
 
 import Foundation
 
-@objc public protocol AnonymousUserManagerProtocol {
-    func trackAnonEvent(name: String, dataFields: [AnyHashable: Any]?)
-    func trackAnonPurchaseEvent(total: NSNumber, items: [CommerceItem], dataFields: [AnyHashable: Any]?)
-    func trackAnonUpdateCart(items: [CommerceItem])
-    func trackAnonTokenRegistration(token: String)
-    func updateAnonSession()
-    func createKnownUser()
-    func getAnonCriteria()
-    func syncNonSyncedEvents()
-    func logout()
-}
-
-public class AnonymousUserManager: AnonymousUserManagerProtocol {
+public class IterableAnonymousUserManager: IterableAnonymousUserManagerProtocol {
     
     init(localStorage: LocalStorageProtocol,
          dateProvider: DateProviderProtocol) {
@@ -48,27 +36,10 @@ public class AnonymousUserManager: AnonymousUserManagerProtocol {
         storeEventData(type: EventType.track, data: body)
     }
     
-    // Convert commerce items to dictionaries
-    private func convertCommerceItemsToDictionary(_ items: [CommerceItem]) -> [[AnyHashable:Any]] {
-        let dictionaries = items.map { item in
-            return item.toDictionary()
-        }
-        return dictionaries
-    }
-    
-    // Convert to commerce items from dictionaries
-    private func convertCommerceItems(from dictionaries: [[AnyHashable: Any]]) -> [CommerceItem] {
-        return dictionaries.compactMap { dictionary in
-            let item = CommerceItem(id: dictionary[JsonKey.CommerceItem.id] as? String ?? "", name: dictionary[JsonKey.CommerceItem.name] as? String ?? "", price: dictionary[JsonKey.CommerceItem.price] as? NSNumber ?? 0, quantity: dictionary[JsonKey.CommerceItem.quantity] as? UInt ?? 0)
-            item.sku = dictionary[JsonKey.CommerceItem.sku] as? String
-            item.itemDescription = dictionary[JsonKey.CommerceItem.description] as? String
-            item.url = dictionary[JsonKey.CommerceItem.url] as? String
-            item.imageUrl = dictionary[JsonKey.CommerceItem.imageUrl] as? String
-            item.categories = dictionary[JsonKey.CommerceItem.categories] as? [String]
-            item.dataFields = dictionary[JsonKey.CommerceItem.dataFields] as? [AnyHashable: Any]
-
-            return item
-        }
+    public func trackAnonUpdateUser(_ dataFields: [AnyHashable: Any]) {
+        var body = [AnyHashable: Any]()
+        body[JsonKey.dataFields] = dataFields
+        storeEventData(type: EventType.updateUser, data: body, shouldOverWrite: true)
     }
     
     // Tracks an anonymous purchase event and store it locally
@@ -108,6 +79,29 @@ public class AnonymousUserManager: AnonymousUserManagerProtocol {
             let initialAnonSessions = IterableAnonSessions(number_of_sessions: 1, last_session: getUTCDateTime(), first_session: getUTCDateTime())
             let anonSessionWrapper = IterableAnonSessionsWrapper(itbl_anon_sessions: initialAnonSessions)
             localStorage.anonymousSessions = anonSessionWrapper
+        }
+    }
+    
+    // Convert commerce items to dictionaries
+    private func convertCommerceItemsToDictionary(_ items: [CommerceItem]) -> [[AnyHashable:Any]] {
+        let dictionaries = items.map { item in
+            return item.toDictionary()
+        }
+        return dictionaries
+    }
+    
+    // Convert to commerce items from dictionaries
+    private func convertCommerceItems(from dictionaries: [[AnyHashable: Any]]) -> [CommerceItem] {
+        return dictionaries.compactMap { dictionary in
+            let item = CommerceItem(id: dictionary[JsonKey.CommerceItem.id] as? String ?? "", name: dictionary[JsonKey.CommerceItem.name] as? String ?? "", price: dictionary[JsonKey.CommerceItem.price] as? NSNumber ?? 0, quantity: dictionary[JsonKey.CommerceItem.quantity] as? UInt ?? 0)
+            item.sku = dictionary[JsonKey.CommerceItem.sku] as? String
+            item.itemDescription = dictionary[JsonKey.CommerceItem.description] as? String
+            item.url = dictionary[JsonKey.CommerceItem.url] as? String
+            item.imageUrl = dictionary[JsonKey.CommerceItem.imageUrl] as? String
+            item.categories = dictionary[JsonKey.CommerceItem.categories] as? [String]
+            item.dataFields = dictionary[JsonKey.CommerceItem.dataFields] as? [AnyHashable: Any]
+
+            return item
         }
     }
     
@@ -183,6 +177,9 @@ public class AnonymousUserManager: AnonymousUserManagerProtocol {
                         IterableAPI.implementation?.updateCart(items: convertCommerceItems(from: eventData[JsonKey.Commerce.items] as! [[AnyHashable: Any]]), withUser: userDict, createdAt: eventData[JsonKey.Body.createdAt] as? Int ?? 0, onSuccess: {result in
                             successfulSyncedData.append(eventData[JsonKey.eventTimeStamp] as? Int ?? 0)
                         })
+                        break
+                    case EventType.updateUser:
+                        IterableAPI.implementation?.updateUser(eventData[JsonKey.dataFields] as? [AnyHashable : Any] ?? [:], mergeNestedObjects: false)
                         break
                     default:
                         break
@@ -300,15 +297,15 @@ public class AnonymousUserManager: AnonymousUserManagerProtocol {
                 CriteriaItem(criteriaType: "track", comparator: "equal", name: "viewedCappuccino", aggregateCount: 3, total: nil)
             ]),
             Criteria(criteriaId: "13", criteriaList: [
-                CriteriaItem(criteriaType: "trackPurchase", comparator: nil, name: nil, aggregateCount: nil, total: 3),
-                CriteriaItem(criteriaType: "cartUpdate", comparator: nil, name: nil, aggregateCount: nil, total: nil),
+                CriteriaItem(criteriaType: "trackPurchase", comparator: nil, name: nil, aggregateCount: 10, total: 10),
+                CriteriaItem(criteriaType: "cartUpdate", comparator: nil, name: nil, aggregateCount: 11, total: nil),
             ])
         ]
         localStorage.criteriaData = data
     }
     
     // Stores event data locally
-    private func storeEventData(type: String, data: [AnyHashable: Any]) {
+    private func storeEventData(type: String, data: [AnyHashable: Any], shouldOverWrite: Bool? = false) {
         let storedData = localStorage.anonymousUserEvents
         var eventsDataObjects: [[AnyHashable: Any]] = [[:]]
         
@@ -319,7 +316,11 @@ public class AnonymousUserManager: AnonymousUserManagerProtocol {
         appendData.setValue(for: JsonKey.eventType, value: type)
         appendData.setValue(for: JsonKey.eventTimeStamp, value: Int(dateProvider.currentDate.timeIntervalSince1970)) // this we use as unique idenfier too
 
-        eventsDataObjects.append(appendData)
+        if shouldOverWrite == true {
+            eventsDataObjects = eventsDataObjects.map { var subDictionary = $0; subDictionary[type] = data; return subDictionary }
+        } else {
+            eventsDataObjects.append(appendData)
+        }
         localStorage.anonymousUserEvents = eventsDataObjects
         if (checkCriteriaCompletion()) {
             createKnownUser()

@@ -121,8 +121,8 @@ extension DependencyContainerProtocol {
         RedirectNetworkSession(delegate: delegate)
     }
     
-    func createAnonymousUserManager() -> AnonymousUserManagerProtocol {
-        AnonymousUserManager(localStorage: localStorage,
+    func createAnonymousUserManager() -> IterableAnonymousUserManagerProtocol {
+        IterableAnonymousUserManager(localStorage: localStorage,
                     dateProvider: dateProvider)
     }
     

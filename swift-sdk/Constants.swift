@@ -13,6 +13,7 @@ enum Endpoint {
 enum EventType {
     static let track = "track"
     static let trackPurchase = "trackPurchase"
+    static let updateUser = "updateUser"
     static let cartUpdate = "cartUpdate"
     static let anonSession = "anonSession"
     static let tokenRegistration = "tokenRegistration"
