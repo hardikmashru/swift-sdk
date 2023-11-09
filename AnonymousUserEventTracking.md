@@ -14,6 +14,7 @@ The `AnonymousUserManager` class includes the following key components:
     - `updateAnonSession()`: Updates the anonymous user session.
     - `trackAnonEvent(name: String, dataFields: [AnyHashable: Any]?)`: Tracks an anonymous event and store it locally.
     - `trackAnonPurchaseEvent(total: NSNumber, items: [CommerceItem], dataFields: [AnyHashable: Any]?)`: Tracks an anonymous purchase event and store it locally.
+    - `trackAnonUpdateUser(_ dataFields: [AnyHashable: Any])`: Tracks an anonymous update user event and store it locally.
     - `trackAnonUpdateCart(items: [CommerceItem])`: Tracks an anonymous cart event and store it locally.
     - `trackAnonTokenRegistration(token: String)`: Tracks an anonymous token registration event and store it locally.
     - `getAnonCriteria()`: Gets the anonymous criteria.
@@ -57,6 +58,14 @@ This method tracks an anonymous purchase event. It does the following:
 * Converts the list of commerce items to JSON.
 * Creates a dictionary object with purchase event details, including items, total, timestamp, data fields, and tracking type.
 * Stores the purchase event data in local storage.
+* Checks criteria completion and creates a known user if criteria are met.
+
+### `trackAnonUpdateUser(dataFields: [AnyHashable: Any]?)`
+
+This method tracks an anonymous update user event. It does the following:
+
+* Creates a dictionary object with event details, including the event name, timestamp, data fields, and tracking type.
+* Stores the event data in local storage, and if data of this event already exists it replaces the data.
 * Checks criteria completion and creates a known user if criteria are met.
 
 ### `trackAnonUpdateCart(items: [CommerceItem])`
