@@ -188,7 +188,7 @@ struct CriteriaCompletionChecker {
                let fieldType = node["fieldType"] as? String {
                 for key in localDataKeys {
                     if field.hasSuffix(key as! String), let matchObj = eventData[key] {
-                        if evaluateComparison(comparatorType: comparatorType, fieldType: fieldType, matchObj: matchObj, node: node) {
+                        if evaluateComparison(comparatorType: comparatorType, fieldType: fieldType, matchObj: matchObj, valueToCompare:  node["value"] as? String) {
                             isEvaluateSuccess = true
                             break
                         }
@@ -199,33 +199,63 @@ struct CriteriaCompletionChecker {
         return isEvaluateSuccess
     }
 
-    func evaluateComparison(comparatorType: String, fieldType: String, matchObj: Any, node: [String: Any]) -> Bool {
-        
-        if let valueAsString = node["value"] as? String {
-            switch comparatorType {
-                case "Equals":
-                    return compareEqual(matchObj, stringValue: valueAsString)
-                case "DoesNotEquals":
-                    return compareNotEqual(matchObj, stringValue: valueAsString)
-                case "GreaterThan":
-                    return compareGreaterThan(matchObj, stringValue: valueAsString)
-                case "LessThan":
-                    return compareLessThan(matchObj, stringValue: valueAsString)
-                case "GreaterThanOrEqualTo":
-                    return compareGreaterThanEqualTo(matchObj, stringValue: valueAsString)
-                case "LessThanOrEqualTo":
-                    return compareLessThanEqualTo(matchObj, stringValue: valueAsString)
-                case "Contains":
-                    return contains(matchObj, stringValue: valueAsString)
-                case "StartsWith":
-                    return startsWith(matchObj, stringValue: valueAsString)
-                case "MatchesRegex":
-                    return compareWithRegex(matchObj as? String ?? "", pattern: valueAsString)
-                default:
-                    return false
-            }
+    func evaluateComparison(comparatorType: String, fieldType: String, matchObj: Any, valueToCompare: String?) -> Bool {
+        guard let stringValue = valueToCompare else {
+            return false
         }
-        return false
+        
+        switch comparatorType {
+            case "Equals":
+                return compareValueEquality(matchObj, stringValue)
+            case "DoesNotEquals":
+                return !compareValueEquality(matchObj, stringValue)
+            case "GreaterThan":
+                return compareNumericValues(matchObj, stringValue, compareOperator: >)
+            case "LessThan":
+                return compareNumericValues(matchObj, stringValue, compareOperator: <)
+            case "GreaterThanOrEqualTo":
+                return compareNumericValues(matchObj, stringValue, compareOperator: >=)
+            case "LessThanOrEqualTo":
+                return compareNumericValues(matchObj, stringValue, compareOperator: <=)
+            case "Contains":
+                return compareStringContains(matchObj, stringValue)
+            case "StartsWith":
+                return compareStringStartsWith(matchObj, stringValue)
+            case "MatchesRegex":
+                return compareWithRegex(matchObj as? String ?? "", pattern: stringValue)
+            default:
+                return false
+        }
+    }
+
+    func compareValueEquality(_ sourceTo: Any, _ stringValue: String) -> Bool {
+        switch (sourceTo, stringValue) {
+            case (let doubleNumber as Double, let value): return doubleNumber == Double(value)
+            case (let intNumber as Int, let value): return intNumber == Int(value)
+            case (let longNumber as Int64, let value): return longNumber == Int64(value)
+            case (let booleanValue as Bool, let value): return booleanValue == Bool(value)
+            case (let stringTypeValue as String, let value): return stringTypeValue == value
+            default: return false
+        }
+    }
+
+    func compareNumericValues(_ sourceTo: Any, _ stringValue: String, compareOperator: (Double, Double) -> Bool) -> Bool {
+        switch (sourceTo, Double(stringValue)) {
+            case (let doubleNumber as Double, let value): return compareOperator(doubleNumber, value ?? 0.0)
+            case (let intNumber as Int, let value): return compareOperator(Double(intNumber), value ?? 0.0)
+            case (let longNumber as Int64, let value): return compareOperator(Double(longNumber), value ?? 0.0)
+            default: return false
+        }
+    }
+
+    func compareStringContains(_ sourceTo: Any, _ stringValue: String) -> Bool {
+        guard let stringTypeValue = sourceTo as? String else { return false }
+        return stringTypeValue.contains(stringValue)
+    }
+
+    func compareStringStartsWith(_ sourceTo: Any, _ stringValue: String) -> Bool {
+        guard let stringTypeValue = sourceTo as? String else { return false }
+        return stringTypeValue.hasPrefix(stringValue)
     }
     
     func compareWithRegex(_ sourceTo: String, pattern: String) -> Bool {
@@ -236,110 +266,6 @@ struct CriteriaCompletionChecker {
         } catch {
             print("Error creating regex: \(error)")
             return false
-        }
-    }
-    
-    func startsWith(_ sourceTo: Any, stringValue: String) -> Bool {
-        switch sourceTo {
-            case let stringTypeValue as String:
-                return stringTypeValue.starts(with:stringValue)
-            default:
-                return false // Or handle other types accordingly
-        }
-    }
-    
-    func contains(_ sourceTo: Any, stringValue: String) -> Bool {
-        switch sourceTo {
-            case let stringTypeValue as String:
-                return stringTypeValue.contains(stringValue)
-            default:
-                return false // Or handle other types accordingly
-        }
-    }
-    
-    func compareEqual(_ sourceTo: Any, stringValue: String) -> Bool {
-        switch sourceTo {
-            case let doubleNumber as Double:
-                return doubleNumber == Double(stringValue)
-            case let intNumber as Int:
-                return intNumber == Int(stringValue)
-            case let longNumber as Int64:
-                return longNumber == Int64(stringValue)
-            case let booleanValue as Bool:
-                return booleanValue == Bool(stringValue)
-            case let stringTypeValue as String:
-                return stringTypeValue == stringValue
-            default:
-                return false // Or handle other types accordingly
-        }
-    }
-    
-    func compareNotEqual(_ sourceTo: Any, stringValue: String) -> Bool {
-        switch sourceTo {
-            case let doubleNumber as Double:
-                return doubleNumber != Double(stringValue)
-            case let intNumber as Int:
-                return intNumber != Int(stringValue)
-            case let longNumber as Int64:
-                return longNumber != Int64(stringValue)
-            case let booleanValue as Bool:
-                return booleanValue != Bool(stringValue)
-            case let stringTypeValue as String:
-                return stringTypeValue != stringValue
-            default:
-                return false // Or handle other types accordingly
-        }
-    }
-    
-    func compareGreaterThan(_ sourceTo: Any, stringValue: String) -> Bool {
-        switch sourceTo {
-            case let doubleNumber as Double:
-                return doubleNumber > Double(stringValue) ?? 0.0
-            case let intNumber as Int:
-            return intNumber > Int(stringValue) ?? 0
-            case let longNumber as Int64:
-                return longNumber > Int64(stringValue) ?? 0
-            default:
-                return false // Or handle other types accordingly
-        }
-    }
-    
-    func compareLessThan(_ sourceTo: Any, stringValue: String) -> Bool {
-        switch sourceTo {
-            case let doubleNumber as Double:
-                return doubleNumber < Double(stringValue) ?? 0.0
-            case let intNumber as Int:
-            return intNumber < Int(stringValue) ?? 0
-            case let longNumber as Int64:
-                return longNumber < Int64(stringValue) ?? 0
-            default:
-                return false // Or handle other types accordingly
-        }
-    }
-    
-    func compareGreaterThanEqualTo(_ sourceTo: Any, stringValue: String) -> Bool {
-        switch sourceTo {
-            case let doubleNumber as Double:
-                return doubleNumber >= Double(stringValue) ?? 0.0
-            case let intNumber as Int:
-            return intNumber >= Int(stringValue) ?? 0
-            case let longNumber as Int64:
-                return longNumber >= Int64(stringValue) ?? 0
-            default:
-                return false // Or handle other types accordingly
-        }
-    }
-    
-    func compareLessThanEqualTo(_ sourceTo: Any, stringValue: String) -> Bool {
-        switch sourceTo {
-            case let doubleNumber as Double:
-                return doubleNumber <= Double(stringValue) ?? 0.0
-            case let intNumber as Int:
-            return intNumber <= Int(stringValue) ?? 0
-            case let longNumber as Int64:
-                return longNumber <= Int64(stringValue) ?? 0
-            default:
-                return false // Or handle other types accordingly
         }
     }
     
