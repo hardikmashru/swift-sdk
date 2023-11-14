@@ -176,7 +176,7 @@ public class AnonymousUserManager: AnonymousUserManagerProtocol {
     // Gets the anonymous criteria
     public func getAnonCriteria() {
         // call API when it is available and save data in userdefaults, until then just save the data in userdefaults using static data from anoncriteria_response.json
-        if let path = Bundle.module.path(forResource: "anoncriteria_response", ofType: "json") {
+        if let path = Bundle.main.path(forResource: "anoncriteria_response", ofType: "json") {
             let fileURL = URL(fileURLWithPath: path)
             do {
                 let data = try Data(contentsOf: fileURL)

@@ -69,6 +69,7 @@ struct CriteriaCompletionChecker {
                 for criteria in criteriaList {
                     // Perform operations on each criteria
                     if let searchQuery = criteria["searchQuery"] as? [String: Any], let currentCriteriaId = criteria["criteriaId"] as? Int {
+                        // we will split purhase/updatecart event items as seperate events because we need to compare it against the single item in criteria json
                         var eventsToProcess = getPurchaseEventsToProcess()
                         eventsToProcess.append(contentsOf: getNonPurchaseEvents())
                         let result = evaluateTree(node: searchQuery, localEventData: eventsToProcess)
@@ -115,15 +116,19 @@ struct CriteriaCompletionChecker {
         }
         
         var processedEvents: [[AnyHashable: Any]] = [[:]]
-        for item in purchaseEvents {
-            if let items = item["items"] as? [[AnyHashable: Any]] {
-                let itemsWithTotal = items.map { item -> [AnyHashable: Any] in
-                    var itemWithTotal = item
-                    let total = item["total"] as? String
-                    itemWithTotal["total"] = total
-                    return itemWithTotal
+        for eventItem in purchaseEvents {
+            if let items = eventItem["items"] as? [[AnyHashable: Any]] {
+                let itemsWithOtherProps = items.map { item -> [AnyHashable: Any] in
+                    var updatedItem = item
+                    
+                    for (key, value) in eventItem {
+                        if (key as! String != "items") {
+                            updatedItem[key] = value
+                        }
+                    }
+                    return updatedItem
                 }
-                processedEvents.append(contentsOf: itemsWithTotal)
+                processedEvents.append(contentsOf: itemsWithOtherProps)
             }
         }
         return processedEvents
@@ -183,14 +188,16 @@ struct CriteriaCompletionChecker {
         var isEvaluateSuccess = false
         for eventData in localEventData {
             let localDataKeys = eventData.keys
-            if let field = node["field"] as? String,
-               let comparatorType = node["comparatorType"] as? String,
-               let fieldType = node["fieldType"] as? String {
-                for key in localDataKeys {
-                    if field.hasSuffix(key as! String), let matchObj = eventData[key] {
-                        if evaluateComparison(comparatorType: comparatorType, fieldType: fieldType, matchObj: matchObj, valueToCompare:  node["value"] as? String) {
-                            isEvaluateSuccess = true
-                            break
+            if node["dataType"] as? String == eventData["dataType"] as? String {
+                if let field = node["field"] as? String,
+                   let comparatorType = node["comparatorType"] as? String,
+                   let fieldType = node["fieldType"] as? String {
+                    for key in localDataKeys {
+                        if field.hasSuffix(key as! String), let matchObj = eventData[key] {
+                            if evaluateComparison(comparatorType: comparatorType, fieldType: fieldType, matchObj: matchObj, valueToCompare:  node["value"] as? String) {
+                                isEvaluateSuccess = true
+                                break
+                            }
                         }
                     }
                 }
@@ -210,10 +217,12 @@ struct CriteriaCompletionChecker {
             case "DoesNotEquals":
                 return !compareValueEquality(matchObj, stringValue)
             case "GreaterThan":
+                print("GreatherThan:: \(compareNumericValues(matchObj, stringValue, compareOperator: >))")
                 return compareNumericValues(matchObj, stringValue, compareOperator: >)
             case "LessThan":
                 return compareNumericValues(matchObj, stringValue, compareOperator: <)
             case "GreaterThanOrEqualTo":
+                print("GreaterThanOrEqualTo:: \(compareNumericValues(matchObj, stringValue, compareOperator: >=))")
                 return compareNumericValues(matchObj, stringValue, compareOperator: >=)
             case "LessThanOrEqualTo":
                 return compareNumericValues(matchObj, stringValue, compareOperator: <=)
@@ -240,13 +249,28 @@ struct CriteriaCompletionChecker {
     }
 
     func compareNumericValues(_ sourceTo: Any, _ stringValue: String, compareOperator: (Double, Double) -> Bool) -> Bool {
-        switch (sourceTo, Double(stringValue)) {
-            case (let doubleNumber as Double, let value): return compareOperator(doubleNumber, value ?? 0.0)
-            case (let intNumber as Int, let value): return compareOperator(Double(intNumber), value ?? 0.0)
-            case (let longNumber as Int64, let value): return compareOperator(Double(longNumber), value ?? 0.0)
-            default: return false
+        if let sourceNumber = Double(stringValue) {
+            switch sourceTo {
+            case let doubleNumber as Double:
+                return compareOperator(doubleNumber, sourceNumber)
+            case let intNumber as Int:
+                return compareOperator(Double(intNumber), sourceNumber)
+            case let longNumber as Int64:
+                return compareOperator(Double(longNumber), sourceNumber)
+            case let stringNumber as String:
+                if let doubleFromString = Double(stringNumber) {
+                    return compareOperator(doubleFromString, sourceNumber)
+                } else {
+                    return false // Handle the case where string cannot be converted to a Double
+                }
+            default:
+                return false
+            }
+        } else {
+            return false // Handle the case where stringValue cannot be converted to a Double
         }
     }
+
 
     func compareStringContains(_ sourceTo: Any, _ stringValue: String) -> Bool {
         guard let stringTypeValue = sourceTo as? String else { return false }

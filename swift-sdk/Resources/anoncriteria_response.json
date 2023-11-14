@@ -4,7 +4,7 @@
       {
          "criteriaId":12345,
          "searchQuery":{
-            "combinator":"Or",
+            "combinator":"And",
             "searchQueries":[
                {
                   "combinator":"And",
@@ -25,11 +25,20 @@
                               {
                                  "field":"shoppingCartItems.quantity",
                                  "fieldType":"long",
-                                 "comparatorType":"GreaterThanOrEqualTo",
+                                 "comparatorType":"GreaterThan",
                                  "dataType":"purchase",
                                  "id":3,
                                  "valueLong":2,
                                  "value":"2"
+                              },
+                              {
+                                 "field":"total",
+                                 "fieldType":"long",
+                                 "comparatorType":"GreaterThanOrEqualTo",
+                                 "dataType":"purchase",
+                                 "id":4,
+                                 "valueLong":10,
+                                 "value":"10"
                               }
                            ]
                         }

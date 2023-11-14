@@ -2,8 +2,9 @@
 
 ## Class Introduction
 
-The `AnonymousUserManager` class is responsible for managing anonymous user sessions and tracking events. 
-It includes methods for updating sessions, tracking events (i.e regular, update cart and purchase) and create a user if criterias are met.
+The `AnonymousUserManager` class is responsible for managing anonymous user sessions and tracking events.
+The `AnonymousUserManager+Functions` class is contains util functions and `CriteriaCompletionChecker` struct which contains criteria checking logic.
+It includes methods for updating sessions, tracking events (i.e custom event, update cart, update user and purchase) and create a user if criterias are met.
 We call track methods of this class internally to make sure we have tracked the events even when user is NOT logged in and after certain criterias are met we create a user and logs them automatically and sync events through Iterable API.
 
 ## Class Structure
@@ -27,10 +28,7 @@ The `AnonymousUserManager` class includes the following key components:
     - `syncNonSyncedEvents()`: Syncs unsynced data which might have failed to sync when calling syncEvents for the first time after criterias met.
     - `convertCommerceItems(from dictionaries: [[AnyHashable: Any]]) -> [CommerceItem]`: Convert to commerce items from dictionaries.
     - `convertCommerceItemsToDictionary(_ items: [CommerceItem]) -> [[AnyHashable:Any]]`: Convert commerce items to dictionaries.
-    - `filterEvents(byType type: String) -> [[AnyHashable: Any]]?`: Filter events by type.
-    - `filterEvents(byType type: String, andName name: String?) -> [[AnyHashable: Any]]?`: Filter events by type and name.
     - `getUTCDateTime()`: Converts UTC Datetime from current time.
-    - `filterEvents(excludingTimestamps excludedTimestamps: [Int]) -> [[AnyHashable: Any]]?`: Filter non-synced data.
 
 
 ## Methods Description
@@ -87,7 +85,7 @@ This method is responsible for fetching criteria data. It simulates calling an A
 
 ### `checkCriteriaCompletion()`
 
-This private method checks if criteria for creating a known user are met. It compares stored event data with predefined criteria and returns `true` if criteria are completed.
+This private method checks if criteria for creating a known user are met. It compares stored event data with predefined criteria and returns `criteriaId` if any of the criteria is matched.
 
 ### `createKnownUser()`
 
