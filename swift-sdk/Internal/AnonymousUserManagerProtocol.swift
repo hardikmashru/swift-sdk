@@ -12,7 +12,6 @@ import Foundation
     func trackAnonTokenRegistration(token: String)
     func trackAnonUpdateUser(_ dataFields: [AnyHashable: Any])
     func updateAnonSession()
-    func createKnownUser()
     func getAnonCriteria()
     func syncNonSyncedEvents()
     func logout()

@@ -10,11 +10,13 @@ import Foundation
 public class AnonymousUserManager: AnonymousUserManagerProtocol {
     
     init(localStorage: LocalStorageProtocol,
-         dateProvider: DateProviderProtocol) {
+         dateProvider: DateProviderProtocol,
+         notificationStateProvider: NotificationStateProviderProtocol) {
         ITBInfo()
         
         self.localStorage = localStorage
         self.dateProvider = dateProvider
+        self.notificationStateProvider = notificationStateProvider
     }
     
     deinit {
@@ -23,7 +25,8 @@ public class AnonymousUserManager: AnonymousUserManagerProtocol {
     
     private var localStorage: LocalStorageProtocol
     private let dateProvider: DateProviderProtocol
-    
+    private let notificationStateProvider: NotificationStateProviderProtocol
+
     // Tracks an anonymous event and store it locally
     public func trackAnonEvent(name: String, dataFields: [AnyHashable: Any]?) {
         var body = [AnyHashable: Any]()
@@ -84,13 +87,18 @@ public class AnonymousUserManager: AnonymousUserManagerProtocol {
     }
     
     // Creates a user after criterias met and login the user and then sync the data through track APIs
-    public func createKnownUser() {
-        let userId = IterableUtil.generateUUID()
-        print("userID: \(userId)")
-        IterableAPI.setUserId(userId)
-        IterableAPI.updateUser(convertToDictionary(data: localStorage.anonymousSessions), mergeNestedObjects: false, onSuccess: { result in
-            self.syncEvents()
-        })
+    private func createKnownUserIfCriteriaMatched(criteriaId: Int?) {
+        if (criteriaId != nil) {
+            let userId = IterableUtil.generateUUID()
+            IterableAPI.setUserId(userId)
+            var anonSessions = convertToDictionary(data: localStorage.anonymousSessions?.itbl_anon_sessions)
+            anonSessions["anon_criteria_id"] = criteriaId
+            notificationStateProvider.isNotificationsEnabled { isEnabled in
+                anonSessions["pushOptIn"] = isEnabled
+                IterableAPI.track(event: "itbl_anon_sessions", dataFields: anonSessions)
+                self.syncEvents()
+            }
+        }
     }
     
     // Syncs unsynced data which might have failed to sync when calling syncEvents for the first time after criterias met
@@ -165,18 +173,18 @@ public class AnonymousUserManager: AnonymousUserManagerProtocol {
         }
     }
     
-    // Checks if criterias are being met.
-    private func checkCriteriaCompletion() -> Bool {
+    // Checks if criterias are being met and returns criteriaId if it matches the criteria.
+    private func evaluateCriteriaAndReturnID() -> Int? {
         guard let events = localStorage.anonymousUserEvents, let criteriaData = localStorage.criteriaData  else {
-            return false
+            return nil
         }
         let matchedCriteriaId = CriteriaCompletionChecker(anonymousCriteria: criteriaData, anonymousEvents: events).getMatchedCriteria()
-        return matchedCriteriaId != nil
+        return matchedCriteriaId
     }
     // Gets the anonymous criteria
     public func getAnonCriteria() {
         // call API when it is available and save data in userdefaults, until then just save the data in userdefaults using static data from anoncriteria_response.json
-        if let path = Bundle.main.path(forResource: "anoncriteria_response", ofType: "json") {
+        if let path = Bundle.module.path(forResource: "anoncriteria_response", ofType: "json") {
             let fileURL = URL(fileURLWithPath: path)
             do {
                 let data = try Data(contentsOf: fileURL)
@@ -208,8 +216,6 @@ public class AnonymousUserManager: AnonymousUserManagerProtocol {
             eventsDataObjects.append(appendData)
         }
         localStorage.anonymousUserEvents = eventsDataObjects
-        if (checkCriteriaCompletion()) {
-            createKnownUser()
-        }
+        createKnownUserIfCriteriaMatched(criteriaId: evaluateCriteriaAndReturnID())
     }
 }

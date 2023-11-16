@@ -123,7 +123,8 @@ extension DependencyContainerProtocol {
     
     func createAnonymousUserManager() -> AnonymousUserManagerProtocol {
         AnonymousUserManager(localStorage: localStorage,
-                    dateProvider: dateProvider)
+                             dateProvider: dateProvider, 
+                             notificationStateProvider: notificationStateProvider)
     }
     
     private func createTaskScheduler(persistenceContextProvider: IterablePersistenceContextProvider,
