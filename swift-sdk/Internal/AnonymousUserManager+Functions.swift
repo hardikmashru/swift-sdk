@@ -70,8 +70,8 @@ struct CriteriaCompletionChecker {
                     // Perform operations on each criteria
                     if let searchQuery = criteria["searchQuery"] as? [String: Any], let currentCriteriaId = criteria["criteriaId"] as? Int {
                         // we will split purhase/updatecart event items as seperate events because we need to compare it against the single item in criteria json
-                        var eventsToProcess = getPurchaseEventsToProcess()
-                        eventsToProcess.append(contentsOf: getNonPurchaseEvents())
+                        var eventsToProcess = getEventsWithCartItems()
+                        eventsToProcess.append(contentsOf: getNonCartEvents())
                         let result = evaluateTree(node: searchQuery, localEventData: eventsToProcess)
                         if (result) {
                             criteriaId = currentCriteriaId
@@ -97,20 +97,34 @@ struct CriteriaCompletionChecker {
         return itemKeys
     }
     
-    func getNonPurchaseEvents() -> [[AnyHashable: Any]] {
+    func getNonCartEvents() -> [[AnyHashable: Any]] {
         let nonPurchaseEvents = anonymousEvents.filter { dictionary in
             if let dataType = dictionary[JsonKey.eventType] as? String {
-                return dataType != EventType.purchase
+                return dataType != EventType.purchase && dataType != EventType.cartUpdate
             }
             return false
         }
-        return nonPurchaseEvents
+        var processedEvents: [[AnyHashable: Any]] = [[:]]
+        for eventItem in nonPurchaseEvents {
+            var updatedItem = eventItem
+            // handle dataFields if any
+            if let dataFields = eventItem["dataFields"] as? [AnyHashable: Any] {
+                for (key, value) in dataFields {
+                    if key is String {
+                        updatedItem[key] = value
+                    }
+                }
+                updatedItem.removeValue(forKey: "dataFields")
+            }
+            processedEvents.append(updatedItem)
+        }
+        return processedEvents
     }
     
-    func getPurchaseEventsToProcess() -> [[AnyHashable: Any]] {
+    func getEventsWithCartItems() -> [[AnyHashable: Any]] {
         let purchaseEvents = anonymousEvents.filter { dictionary in
             if let dataType = dictionary[JsonKey.eventType] as? String {
-                return dataType == EventType.purchase
+                return dataType == EventType.purchase || dataType == EventType.cartUpdate
             }
             return false
         }
@@ -119,10 +133,25 @@ struct CriteriaCompletionChecker {
         for eventItem in purchaseEvents {
             if let items = eventItem["items"] as? [[AnyHashable: Any]] {
                 let itemsWithOtherProps = items.map { item -> [AnyHashable: Any] in
-                    var updatedItem = item
+                    var updatedItem = [AnyHashable: Any]()
+                    
+                    for (key, value) in item {
+                        if let stringKey = key as? String {
+                            updatedItem["shoppingCartItems." + stringKey] = value
+                        }
+                    }
+                    
+                    // handle dataFields if any
+                    if let dataFields = eventItem["dataFields"] as? [AnyHashable: Any] {
+                        for (key, value) in dataFields {
+                            if key is String {
+                                updatedItem[key] = value
+                            }
+                        }
+                    }
                     
                     for (key, value) in eventItem {
-                        if (key as! String != "items") {
+                        if (key as! String != "items" && key as! String != "dataFields") {
                             updatedItem[key] = value
                         }
                     }
@@ -193,7 +222,7 @@ struct CriteriaCompletionChecker {
                    let comparatorType = node["comparatorType"] as? String,
                    let fieldType = node["fieldType"] as? String {
                     for key in localDataKeys {
-                        if field.hasSuffix(key as! String), let matchObj = eventData[key] {
+                        if field == key as! String, let matchObj = eventData[key] {
                             if evaluateComparison(comparatorType: comparatorType, fieldType: fieldType, matchObj: matchObj, valueToCompare:  node["value"] as? String) {
                                 isEvaluateSuccess = true
                                 break

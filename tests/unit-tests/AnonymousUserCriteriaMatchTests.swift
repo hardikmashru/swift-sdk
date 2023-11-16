@@ -103,10 +103,47 @@ class AnonymousUserCriteriaMatchTests: XCTestCase {
                                      "id":4,
                                      "valueLong":10,
                                      "value":"10"
+                                  },
+                                  {
+                                     "field":"campaignId",
+                                     "fieldType":"long",
+                                     "comparatorType":"Equals",
+                                     "dataType":"purchase",
+                                     "id":11,
+                                     "value":"1234"
                                   }
                                ]
                             }
-                         }
+                         },
+                       {
+                       "combinator":"And",
+                       "searchQueries":[
+                          {
+                             "dataType":"customEvent",
+                             "searchCombo":{
+                                "combinator":"Or",
+                                "searchQueries":[
+                                   {
+                                       "field":"eventName",
+                                       "fieldType":"string",
+                                       "comparatorType":"Equals",
+                                       "dataType":"customEvent",
+                                       "id":9,
+                                       "value":"processing_cancelled"
+                                   },
+                                   {
+                                       "field":"messageId",
+                                       "fieldType":"string",
+                                       "comparatorType":"Equals",
+                                       "dataType":"customEvent",
+                                       "id":10,
+                                       "value":"1234"
+                                   }
+                                ]
+                             }
+                          }
+                        ]
+                       }
                       ]
                    }
                 ]
@@ -129,8 +166,9 @@ class AnonymousUserCriteriaMatchTests: XCTestCase {
             "items": [["id": "12", "name": "Mocha", "price": 4.67, "quantity": 3]],
             "total": 11.0,
             "createdAt": 1699246745093,
-            "dataType": "purchase"
-        ]]
+            "dataType": "purchase",
+            "dataFields": ["campaignId": 1234]
+        ], ["dataType": "customEvent", "eventName": "processing_cancelled"]]
         let expectedCriteriaId = 12345
         let matchedCriteriaId = CriteriaCompletionChecker(anonymousCriteria: data(from: mockDataWithAnd)!, anonymousEvents: eventItems).getMatchedCriteria()
         XCTAssertEqual(matchedCriteriaId, expectedCriteriaId)
